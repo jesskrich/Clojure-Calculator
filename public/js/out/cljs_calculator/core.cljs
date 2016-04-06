@@ -4,18 +4,16 @@
               [reagent.session :as session]
               [secretary.core :as secretary :include-macros true]))
 
-;; -------------------------
-;; Views
 
-(def initial-db {:readout :op1
+(def initial-db {:display :op1
                    :op1 ""
                    :op2 ""
-                   :next-op ""
-                   :current-op ""
+                   :operator1 ""
+                   :operator2 ""
+                   :result ""
                    :zeroes-blocked true})
 
 (def app-db (atom initial-db))
-;(reset! app-db initial-db)
 
 (defn header [color text]
   [:h1
@@ -35,63 +33,58 @@
 
 (defn operate []
   (let [db @app-db
-        _ (js/console.log "db start" (pr-str db))
         op1 (get db :op1)
         op2 (get db :op2)
         op1-n (read-string op1)
         op2-n (read-string op2)
-        op (get db :next-op)
-        op-fn (get ops (get db :next-op))
+        operator1 (get db :operator1)
+        operator2 (db :operator2)
+        op-fn (get ops (get db :operator1))
         result (op-fn op1-n op2-n)]
     (reset! app-db {:op1 (str result)
                     :op2 ""
-                    :readout :op1
-                    :next-op ""
-                    :zeroes-blocked true})
-    (js/console.log "db end" (pr-str @app-db))))
+                    :display :op1
+                    :operator1 operator2
+                    :operator2 ""
+                    :result :op1
+                    :zeroes-blocked true})))
 
-  ; (swap! app-db assoc :op1 (read-string (get db :op1)))
-  ; (swap! app-db assoc :op2 (read-string (get db :op2)))
-  ; (swap! app-db assoc :op1 (get ops (db :next-op))       (db :op1) (db :op2)))
-  ; (swap! app-db assoc :op2 "")
-  ; (swap! app-db assoc :op1 (str (get db :op1)))
-  ; (swap! app-db assoc :readout :op1)))
-
-  (defn clear []
+(defn clear []
    (reset! app-db initial-db))
-
 
 
 (defn buttons [btn]
  [:div
-
  {:key (pr-str (gensym "button-key-"))
   :on-click
-  #(cond
 
-   (and (= btn 0) (= (@app-db :zeroes-blocked) true))
+  #(let [db @app-db
+         zb (get db :zeroes-blocked)
+         display-key (get db :display)
+         display-str (get db display-key)
+         operator1 (get db :operator1)
+         result (get db :result)
+         op2 (get db :op2)]
+  (cond
+   (and (= btn 0) (= zb true))
     nil
 
    (and (not (some #{"+" "-" "*" "/" "c" "="} (str btn)))
-        (< (count (@app-db (@app-db :readout)))
-           5))
-   (do
-   (swap! app-db update (@app-db :readout) str btn)
-   (swap! app-db assoc :zeroes-blocked false))
+        (< (count display-str) 5) (not= result :op1))
+    (do
+     (swap! app-db update display-key str btn)
+     (swap! app-db assoc :zeroes-blocked false))
 
    (some #{"+" "-" "*" "/"} (str btn))
     (do
-     (swap! app-db assoc :next-op btn)
      (swap! app-db assoc :zeroes-blocked true)
-      (if (= (@app-db :op2) "" )
-      (swap! app-db assoc :readout :op2)
-
-      (operate)))
-   (= btn "=")
-   (operate)
-   (= btn "c")
-   (clear))
-
+       (swap! app-db assoc :result "")
+       (swap! app-db assoc :operator1 btn)
+       (swap! app-db assoc :display :op2))
+  (= btn "=")
+  (operate)
+  (= btn "c")
+  (clear)))
     :style
    {:height (px 40)
     :width (px 40)
@@ -107,21 +100,6 @@
     :font-weight "bold"}}
   btn])
 
-
-
-
-(defn click-count []
- [:div
-  {:on-click #(swap! app-db assoc :click-count (inc (@app-db :click-count)))
-   :style
-   {:background-color "orange"
-    :width 100
-    :height 100
-    :text-align "center"}}
-  [:div "click-count"]
-  [:div (str  (@app-db :click-count))]])
-  ; dereference value on display
-
 (defn calculator [ ]
   [:div
   {:key (pr-str (gensym "calculator-"))
@@ -136,7 +114,7 @@
       :margin-top "0px"
       :padding-left (px 10)}}
       [:div
-      {:key (pr-str (gensym "readout-"))
+      {:key (pr-str (gensym "display-"))
        :style
         {:position "relative"
          :left "50%"
@@ -150,7 +128,7 @@
          :border "1px solid"
          :text-align "right"
          :padding-right (px 5)}}
-         (let [ro (@app-db (@app-db :readout))]
+         (let [ro (@app-db (@app-db :display))]
           (if (= ro "")
            "0"
            (apply str ro)))]
@@ -160,7 +138,6 @@
 
 (defn home-page []
   [:div
-   [click-count]
    [header "red" "Calculator"]
    [:h2
     {:style
